@@ -1,15 +1,13 @@
 using UnityEngine;
 
-// Assets/Scripts/Cards/CardDefinition.cs
-using UnityEngine;
+[CreateAssetMenu(fileName = "Card Definition", menuName = "Cabboo/Card Definition")]
+public class CardDefinition : ScriptableObject
+{
+    [SerializeField] private Suit suit;
+    [SerializeField] private int rank;
+    [SerializeField] private Sprite faceSprite;
 
-[CreateAssetMenu(menuName="Cards/CardDefinition")]
-public class CardDefinition : ScriptableObject {
-  public string cardName;
-  public Suit suit;       // enum { Spade, Heart, Club, Diamond, Joker }
-  public int rank;        // 1–13 (Ace–King, Joker=0)
-  public Sprite faceSprite;
-  public Sprite backSprite;
-  // any flags for special rules: e.g. public bool triggersOnDraw;
+    public Suit Suit => suit;
+    public int Rank => rank;
+    public Sprite FaceSprite => faceSprite;
 }
-

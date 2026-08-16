@@ -6,7 +6,6 @@
 [Bb]uilds/
 [Ll]ogs/
 [Mm]emoryCaptures/
-[Pp]ackages/
 
 # Asset Bundles
 *.assetbundle
@@ -77,9 +76,6 @@ $RECYCLE.BIN/
 # Auto-generated VS/JetBrains Rider .sln files
 *.sln
 
-# Exclude all .meta files, which Unity generates
-*.meta
-
 # Exclude build folders
 [Bb]uild/
 [Bb]uilds/
@@ -99,12 +95,5 @@ $RECYCLE.BIN/
 .idea/
 .idea/**
 
-# Exclude Unity Package Manager packages
-[Pp]ackages/manifest.json
-[Pp]ackages/packages-lock.json
-
 # Exclude UserSettings folder
 UserSettings/
-
-# Ignore the Unity generated asset files
-*.asset
