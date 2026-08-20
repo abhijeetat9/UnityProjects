@@ -2,69 +2,38 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Mirror;
 using UnityEngine;
 using Random = System.Random;
 
 public class TableView : MonoBehaviour
 {
+    public static TableView Instance { get;  private set; }
     private GameController _gameController;
-    private bool [][] _revealState = new bool[4][];
     [SerializeField] private PlayerGridPanel playerGridPanelPrefab;
-    private List<PlayerGridPanel> playerGridPanels = new List<PlayerGridPanel>();
-    [SerializeField] private int numPlayers;
+    private List<PlayerGridPanel> _playerGridPanels = new List<PlayerGridPanel>();
     [SerializeField] private TurnUIController turnUIController;
     [SerializeField] private CardSlot deckSlot;
     [SerializeField] private CardSlot discardSlot;
+    private bool _actionsShown;
+    
+    private void Awake()
+    {
+        Instance = this;
+    }
     
     public void Start()
     {
-        GameState state = RoundSetup.CreateGameState(numPlayers);
-        SpawnPlayersPanel(numPlayers);
-        _gameController = new GameController(state);
-        turnUIController.Initialize(_gameController, playerGridPanels);
+        SpawnPlayersPanel(CabbooNetworkManager.ConnectedPlayerCount);
         deckSlot.ShowHidden();
-        int playerCount = _gameController.State.Players.Count;
-        _revealState = new bool[playerCount][];
-        for (int i = 0; i < playerCount; i++)
-        {
-            _revealState[i] = new bool[4];
-        }
-        _gameController.StateChanged += RenderAll;
-        _gameController.NewRoundStarted += () =>
-        {
-            StartCoroutine(RunInitialPeekPhase());
-        };
-        RenderAll();
-        StartCoroutine(RunInitialPeekPhase());
     }
-    // private GameState SetupTestGame(int numPlayers)
-    // {
-    //     Deck deck = new Deck();
-    //     deck.BuildStandardDeck();
-    //     deck.Shuffle(new Random());
-    //     
-    //     List<PlayerState> players = Enumerable.Range(0, numPlayers)
-    //         .Select(i => new PlayerState(i , $"Player {i}"))
-    //         .ToList();
-    //     
-    //     foreach (var player in players)
-    //     {
-    //         for (int slot = 0; slot < 4; slot++)
-    //         {
-    //             player.Slots[slot] = deck.DrawCard();
-    //         }
-    //     }
-    //
-    //     deck.DiscardCard(deck.DrawCard());
-    //     return new GameState()
-    //     {
-    //         Deck = deck,
-    //         Players = players,
-    //         GamePhases = GamePhase.InitialPeek,
-    //         CurrentPlayerIndex = 0
-    //     };
-    // }
-    
+
+    public void SetGameController(GameController controller)
+    {
+        _gameController = controller;
+        turnUIController.Initialize(controller, _playerGridPanels);
+    }
+
     private void SpawnPlayersPanel(int numPlayers)
     {
         for (int i = 0; i < numPlayers; i++)
@@ -72,50 +41,24 @@ public class TableView : MonoBehaviour
             Vector3 position = GetSeatPosition(i, numPlayers, radius: 5f);
             PlayerGridPanel panel = Instantiate(playerGridPanelPrefab, position, Quaternion.identity);
             panel.SetLabel($"Player {i+1}");
-            playerGridPanels.Add(panel);
+            _playerGridPanels.Add(panel);
         }
     }
 
-    private void RenderAll()
+    public void RenderAll(NetworkGameController.BoardSnapshot snapshot)
     {
-        int count = Math.Min(playerGridPanels.Count, _gameController.State.Players.Count);
+        int count = Math.Min(_playerGridPanels.Count, snapshot.Players.Length);
         for (int i = 0; i < count; i++)
         {
-            playerGridPanels[i].Render(_gameController.State.Players[i], _revealState[i]);
-            playerGridPanels[i].SetActiveTurn(i == _gameController.State.CurrentPlayerIndex);
+            _playerGridPanels[i].Render(snapshot.Players[i]);
+            _playerGridPanels[i].SetActiveTurn(i == snapshot.CurrentPlayerIndex);
         }
-
-        if (_gameController.State.Deck.HasDiscardTop)
+        discardSlot.ShowCard(snapshot.DiscardTop);
+        if (snapshot.GamePhases != GamePhase.InitialPeek && !_actionsShown)
         {
-            discardSlot.ShowCard(_gameController.State.Deck.GetDiscardTop());
+            _actionsShown = true;
+            turnUIController.ShowActions(); 
         }
-        else
-        {
-            discardSlot.ShowEmpty();
-        }
-    }
-
-    private IEnumerator RunInitialPeekPhase()
-    {
-        for (int i = 0; i < _gameController.State.Players.Count; i++)
-        {
-            var peek2 = new PeekOwnCardCommand { SlotIndex = 2 };
-            _gameController.TryExecute(peek2,  _gameController.State.Players[i].PlayerId);
-            _revealState[i][2] = true;
-            var peek3 = new PeekOwnCardCommand { SlotIndex = 3 };
-            _gameController.TryExecute(peek3,  _gameController.State.Players[i].PlayerId);
-            _revealState[i][3] = true;
-        }
-        RenderAll();
-        yield return new WaitForSeconds(5f);
-        for (int i = 0; i < _gameController.State.Players.Count; i++)
-        {
-            _revealState[i][2] = false;
-            _revealState[i][3] = false;
-            
-        }
-        turnUIController.ShowActions();
-        RenderAll(); 
     }
 
     private Vector3 GetSeatPosition(int index, int totalPlayers, float radius)

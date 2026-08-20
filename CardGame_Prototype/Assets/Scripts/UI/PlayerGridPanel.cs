@@ -7,15 +7,14 @@ public class PlayerGridPanel : MonoBehaviour
     public CardSlot[] CardSlots => cardSlots;
     [SerializeField] private TextMeshPro label;
 
-    public void Render(PlayerState player, bool[] revealSlot)
+    public void Render(NetworkGameController.PlayerView player)
     {
         for (int i = 0; i < cardSlots.Length; i++)
         {
-            bool shouldReveal = revealSlot != null && i < revealSlot.Length && revealSlot[i];
             cardSlots[i].SetIdentity(player.PlayerId, i);
-            if (shouldReveal)
+            if (player.Slots[i].Card != null)
             {
-                cardSlots[i].ShowCard(player.Slots[i]);
+                cardSlots[i].ShowCard(player.Slots[i].Card.Value);
             }
             else
             {

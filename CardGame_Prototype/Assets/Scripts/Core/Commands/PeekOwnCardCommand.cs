@@ -1,3 +1,5 @@
+using UnityEngine;
+
 public class PeekOwnCardCommand : ICommand
 {
     public int SlotIndex;
@@ -20,5 +22,7 @@ public class PeekOwnCardCommand : ICommand
     {
         PlayerState peekingPlayer = state.Players.Find(p => p.PlayerId == playerId);
         RevealedCard = peekingPlayer.Slots[SlotIndex];
+        state.RevealedTo[playerId][SlotIndex] = playerId;
+        Debug.Log($"PeekOwnCardCommand.Execute: player {playerId} slot {SlotIndex} -> RevealedTo now {state.RevealedTo[playerId][SlotIndex]}");
     }
 }

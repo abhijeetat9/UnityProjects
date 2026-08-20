@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using TMPro;
@@ -39,15 +40,20 @@ public class TurnUIController : MonoBehaviour
     private int _pendingOwnSlotIndex;
     private ScoreBoard _scoreBoard = new ScoreBoard();
 
-    public void Initialize(GameController controller, List<PlayerGridPanel> panels)
+
+    public void Awake()
     {
-        _controller = controller;
-        playerGridPanels = panels;
         actionPanel.SetActive(false);
         drawnCardPanel.SetActive(false);
         redKingDecisionPanel.SetActive(false);
         roundEndPanel.SetActive(false);
         roundEndText.text = "";
+    }
+
+    public void Initialize(GameController controller, List<PlayerGridPanel> panels)
+    {
+        _controller = controller;
+        playerGridPanels = panels;
         Debug.Log("Intialize: actionPanel set inactive");
     }
 
@@ -409,7 +415,6 @@ public class TurnUIController : MonoBehaviour
     public void ShowActions()
     {
         EnterWaitingForAction();
-        _controller.State.GamePhases = GamePhase.InProgress;
         Debug.Log("ShowActions called");
     }
     
@@ -420,9 +425,12 @@ public class TurnUIController : MonoBehaviour
         deckSlot.Clicked += OnDeckClicked;
         discardSlot.Clicked += OnDiscardClicked;
         drawnCardSlot.ShowEmpty();
-        
-        var current = _controller.State.Players[_controller.State.CurrentPlayerIndex];
-        Debug.Log($"Now {current.PlayerName}'s turn (index {_controller.State.CurrentPlayerIndex})");
+
+        if (_controller != null)
+        {
+            var current = _controller.State.Players[_controller.State.CurrentPlayerIndex];
+            Debug.Log($"Now {current.PlayerName}'s turn (index {_controller.State.CurrentPlayerIndex})");
+        }
     }
 
     private void OnDeckClicked(CardSlot slot)

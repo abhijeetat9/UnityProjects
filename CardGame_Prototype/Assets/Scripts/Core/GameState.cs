@@ -10,7 +10,8 @@ public class GameState
     public int? CabbooCallerIndex;
     public Card? PendingDrawnCard;
     public PendingLookAndSwap PendingLookAndSwap;
-
+    public int?[][] RevealedTo; 
+    
     public void CallCabboo()
     {
         CabbooCallerIndex = CurrentPlayerIndex;
