@@ -57,7 +57,16 @@ public class CardSlot : MonoBehaviour
     {
         if (EventSystem.current.IsPointerOverGameObject())
         {
+            Debug.Log($"CardSlot.OnMouseDown: click on Player {PlayerId} Slot {SlotIndex} SWALLOWED (pointer over UI element)");
             return;
+        }
+        if (Clicked == null)
+        {
+            Debug.Log($"CardSlot.OnMouseDown: click on Player {PlayerId} Slot {SlotIndex} registered but NO LISTENERS subscribed (nothing will happen)");
+        }
+        else
+        {
+            Debug.Log($"CardSlot.OnMouseDown: click on Player {PlayerId} Slot {SlotIndex} -> invoking Clicked");
         }
         Clicked?.Invoke(this);
     }
