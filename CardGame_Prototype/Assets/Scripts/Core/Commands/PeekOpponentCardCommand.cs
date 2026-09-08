@@ -23,6 +23,5 @@ public class PeekOpponentCardCommand : ICommand
     {
         PlayerState targetPlayer = state.Players.Find(p => p.PlayerId == TargetPlayerId);
         RevealedCard = targetPlayer.Slots[SlotIndex];
-        state.RevealedTo[targetPlayer.PlayerId][SlotIndex] = playerId;
     }
 }

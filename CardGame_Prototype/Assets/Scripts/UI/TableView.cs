@@ -10,14 +10,12 @@ public class TableView : MonoBehaviour
 {
     public static TableView Instance { get;  private set; }
     private GameController _gameController;
-    private NetworkPlayer _localPlayer;
     [SerializeField] private PlayerGridPanel playerGridPanelPrefab;
     private List<PlayerGridPanel> _playerGridPanels = new List<PlayerGridPanel>();
     [SerializeField] private TurnUIController turnUIController;
     [SerializeField] private CardSlot deckSlot;
     [SerializeField] private CardSlot discardSlot;
-
-    private bool _panelsSpawned;
+    private bool _actionsShown;
     
     private void Awake()
     {
@@ -26,6 +24,7 @@ public class TableView : MonoBehaviour
     
     public void Start()
     {
+        SpawnPlayersPanel(CabbooNetworkManager.ConnectedPlayerCount);
         deckSlot.ShowHidden();
     }
 
@@ -35,11 +34,6 @@ public class TableView : MonoBehaviour
         turnUIController.Initialize(controller, _playerGridPanels);
     }
 
-    public void SetLocalPlayer(NetworkPlayer player)
-    {
-        _localPlayer = player;
-        turnUIController.SetLocalPlayer(player);
-    }
     private void SpawnPlayersPanel(int numPlayers)
     {
         for (int i = 0; i < numPlayers; i++)
@@ -53,12 +47,6 @@ public class TableView : MonoBehaviour
 
     public void RenderAll(NetworkGameController.BoardSnapshot snapshot)
     {
-        if (!_panelsSpawned)
-        {
-            SpawnPlayersPanel(snapshot.Players.Length);
-            _panelsSpawned = true;
-            turnUIController.SetPlayerGridPanels(_playerGridPanels);
-        }
         int count = Math.Min(_playerGridPanels.Count, snapshot.Players.Length);
         for (int i = 0; i < count; i++)
         {
@@ -66,7 +54,11 @@ public class TableView : MonoBehaviour
             _playerGridPanels[i].SetActiveTurn(i == snapshot.CurrentPlayerIndex);
         }
         discardSlot.ShowCard(snapshot.DiscardTop);
-        turnUIController.OnSnapshotReceived(snapshot);
+        if (snapshot.GamePhases != GamePhase.InitialPeek && !_actionsShown)
+        {
+            _actionsShown = true;
+            turnUIController.ShowActions(); 
+        }
     }
 
     private Vector3 GetSeatPosition(int index, int totalPlayers, float radius)

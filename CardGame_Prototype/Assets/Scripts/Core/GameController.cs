@@ -17,7 +17,7 @@ public class GameController
         {
             return false;
         }
-        command.Execute(State, playerId);
+        command.Execute(State,  playerId);
         StateChanged?.Invoke();
         return true;
     }

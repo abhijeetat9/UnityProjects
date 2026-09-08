@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using Random = System.Random;
 
 public enum TurnUIState
 {
@@ -18,7 +18,6 @@ public enum TurnUIState
 public class TurnUIController : MonoBehaviour
 {
     private GameController _controller;
-    private NetworkPlayer _localPlayer;
     [SerializeField] private TurnUIState _state;
     
     [SerializeField] private GameObject actionPanel;
@@ -35,20 +34,13 @@ public class TurnUIController : MonoBehaviour
     private List<PlayerGridPanel> playerGridPanels;
     [SerializeField] private GameObject usePowerButton;
     private SpecialAbility _currentAbility;
-
-    private int _pendingTargetPlayerId = -1;
-    private int _pendingTargetSlotIndex = -1;
+    
+    private int _pendingTargetPlayerId;
+    private int _pendingTargetSlotIndex;
     private int _pendingOwnSlotIndex;
     private ScoreBoard _scoreBoard = new ScoreBoard();
 
-    private bool hasDrawnCardUIShown;
-    private bool _redKingDecisionShown;
-    private bool _roundEndShown;
-    private bool _actionPanelActive;
-    
-    private Card _cachedDrawnCard;
-    
-    #region Lifecycle & Setup
+
     public void Awake()
     {
         actionPanel.SetActive(false);
@@ -57,252 +49,345 @@ public class TurnUIController : MonoBehaviour
         roundEndPanel.SetActive(false);
         roundEndText.text = "";
     }
+
     public void Initialize(GameController controller, List<PlayerGridPanel> panels)
     {
         _controller = controller;
         playerGridPanels = panels;
         Debug.Log("Intialize: actionPanel set inactive");
     }
-    #endregion
-    
-    #region Network Snapshot Reaction
-    public void SetLocalPlayer(NetworkPlayer player)
-    {
-        _localPlayer = player;
-    }
-    public void OnSnapshotReceived(NetworkGameController.BoardSnapshot snapshot)
-    {
-        DrawnCardSnapshot(snapshot);
-        ActionPanelSnapshot(snapshot);
-        RedKingSnapShot(snapshot);
-        RoundEndSnapshot(snapshot);
-        ResetPendingPowerStateOnNewRound(snapshot);
-    }
 
-    private void DrawnCardSnapshot(NetworkGameController.BoardSnapshot snapshot)
+    public void Draw()
     {
-        if (snapshot.DrawnCard.HasValue && !hasDrawnCardUIShown)
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        if (!_controller.TryDrawCard(currentPlayer))
         {
-            deckSlot.Clicked -= OnDeckClicked;
-            discardSlot.Clicked -= OnDiscardClicked;
-            _state = TurnUIState.WaitingForPlayerChoice;
-            drawnCardSlot.ShowCard(snapshot.DrawnCard.Value);
-            _cachedDrawnCard = snapshot.DrawnCard.Value;
-            actionPanel.SetActive(false);
-            drawnCardSlot.Clicked += OnDrawnCardClicked;
-            Debug.Log($"Drew: {snapshot.DrawnCard.Value}");
-            hasDrawnCardUIShown = true;
-        }
-        else if (!snapshot.DrawnCard.HasValue && hasDrawnCardUIShown)
-        {
-            drawnCardSlot.Clicked -= OnDrawnCardClicked;
-            drawnCardPanel.SetActive(false);
-            drawnCardSlot.ShowEmpty();
-            hasDrawnCardUIShown = false;
-        }
-    }
-
-    // Shows/hides Draw + Call Cabboo purely based on "is it my turn right now,
-    // with nothing pending" - evaluated fresh on every snapshot, not just as a
-    // reaction to my own last action. That's what lets a player's action panel
-    // come back correctly on their second (and later) turns.
-    private void ActionPanelSnapshot(NetworkGameController.BoardSnapshot snapshot)
-    {
-        if (_localPlayer == null)
-        {
-            // First snapshot(s) can arrive before WaitForTableViewAndSetLocalPlayer finishes.
+            Debug.Log("Cannot draw card right now");
             return;
         }
 
-        var isMyTurnIdle = !snapshot.DrawnCard.HasValue
-            && snapshot.Players[snapshot.CurrentPlayerIndex].PlayerId == _localPlayer.SeatIndex
-            && snapshot.GamePhases != GamePhase.InitialPeek
-            && snapshot.GamePhases != GamePhase.RoundEnded;
-
-        if (isMyTurnIdle && !_actionPanelActive)
-        {
-            EnterWaitingForAction();
-            _actionPanelActive = true;
-        }
-        else if (!isMyTurnIdle && _actionPanelActive)
-        {
-            actionPanel.SetActive(false);
-            deckSlot.Clicked -= OnDeckClicked;
-            discardSlot.Clicked -= OnDiscardClicked;
-            _actionPanelActive = false;
-        }
+        deckSlot.Clicked -= OnDeckClicked;
+        discardSlot.Clicked -= OnDiscardClicked;
+        _state = TurnUIState.WaitingForPlayerChoice;
+        drawnCardSlot.ShowCard(_controller.State.PendingDrawnCard.Value);
+        actionPanel.SetActive(false);
+        drawnCardSlot.Clicked += OnDrawnCardClicked;
+        // drawnCardPanel.SetActive(true);
+        Debug.Log($"Drew: {_controller.State.PendingDrawnCard.Value}");
     }
 
-    private void RoundEndSnapshot(NetworkGameController.BoardSnapshot snapshot)
-    {
-        if (snapshot.GamePhases == GamePhase.RoundEnded && !_roundEndShown)
-        {
-            _roundEndShown = true;
-            ShowRoundEnd(snapshot);
-        }
-        else if (snapshot.GamePhases == GamePhase.InitialPeek && _roundEndShown)
-        {
-            _roundEndShown = false;
-            roundEndPanel.SetActive(false);
-        }
-    }
-
-    private void ResetPendingPowerStateOnNewRound(NetworkGameController.BoardSnapshot snapshot)
-    {
-        if (snapshot.GamePhases == GamePhase.InitialPeek)
-        {
-            _pendingTargetPlayerId = -1;
-            _pendingTargetSlotIndex = -1;
-            _redKingDecisionShown = false;
-            redKingDecisionPanel.SetActive(false);
-        }
-    }
-    private void RedKingSnapShot(NetworkGameController.BoardSnapshot snapshot)
-    {
-        if (snapshot.PendingRedKingDecision && !_redKingDecisionShown)
-        {
-            Debug.Log("RedKingSnapShot: showing decision panel (server-confirmed pending decision)");
-            redKingDecisionPanel.SetActive(true);
-            _state = TurnUIState.WaitingForRedKingDecision;
-            _redKingDecisionShown = true;
-        }
-        else if (!snapshot.PendingRedKingDecision && _redKingDecisionShown)
-        {
-            Debug.Log("RedKingSnapShot: hiding decision panel");
-            redKingDecisionPanel.SetActive(false);
-            _redKingDecisionShown = false;
-        }
-    }
-
-    #endregion
-    
-    #region Idle State
-    private void EnterWaitingForAction()
-    {
-        actionPanel.SetActive(true);
-        _state = TurnUIState.WaitingForAction;
-        deckSlot.Clicked += OnDeckClicked;
-        discardSlot.Clicked += OnDiscardClicked;
-        drawnCardSlot.ShowEmpty();
-
-        if (_controller != null)
-        {
-            var current = _controller.State.Players[_controller.State.CurrentPlayerIndex];
-            Debug.Log($"Now {current.PlayerName}'s turn (index {_controller.State.CurrentPlayerIndex})");
-        }
-    }
-    public void ShowActions()
-    {
-        EnterWaitingForAction();
-        Debug.Log("ShowActions called");
-    }
-    #endregion
-    
-    #region Draw
-    public void Draw()
-    {
-        _localPlayer.CmdDraw();
-    }
-    private void OnDeckClicked(CardSlot slot)
-    {
-        Draw();
-    }
-    #endregion
-    
-    #region Discard / Resolve Drawn Card
-    public void Discard()
-    {
-        _localPlayer.CmdDiscard();
-        // if (!_controller.State.PendingDrawnCard.HasValue)
-        // {
-        //     Debug.Log("Cannot discard right now");
-        //     return;
-        // }
-        //
-        // var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
-        // Card discardedCard = _controller.State.PendingDrawnCard.Value;
-        // if (_controller.TryExecute(new DiscardDrawnCommand(), currentPlayer))
-        // {
-        //     drawnCardPanel.SetActive(false);
-        //     EnterWaitingForAction();
-        //     Debug.Log($"Discard: {discardedCard}");
-        // }
-        // else
-        // {
-        //     Debug.Log("Cannot discard right now");
-        // }
-    }
     private void OnDrawnCardClicked(CardSlot slot)
     {
         drawnCardSlot.Clicked -= OnDrawnCardClicked;
         drawnCardPanel.SetActive(true);
 
-        _currentAbility = SpecialAbilityResolver.GetAbility(_cachedDrawnCard);
+        _currentAbility = SpecialAbilityResolver.GetAbility(_controller.State.PendingDrawnCard.Value);
         usePowerButton.SetActive(_currentAbility != SpecialAbility.None);
     }
-    #endregion
-    
-    #region Swap From Draw
+
     public void StartSwap()
     {
         drawnCardPanel.SetActive(false);
         _state = TurnUIState.WaitingForSwapSlot;
-
-        var currentPlayerId = _localPlayer.SeatIndex;
+        
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
         foreach (var slot in GetOwnSlots(currentPlayerId))
         {
             slot.Clicked += OnSwapSlotClicked;
         }
     }
+    
+    private void StartPeekOwn()
+    {
+        drawnCardPanel.SetActive(false);
+        _state = TurnUIState.WaitingForOwnSlotForPower;
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slot in GetOwnSlots(currentPlayerId))
+        {
+            slot.Clicked += OnPeekOwnSlotClicked;
+        }
+    }
+
+    private void StartPeekTarget()
+    {
+        drawnCardPanel.SetActive(false);
+        _state = TurnUIState.WaitingForPowerTarget;
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slot in GetTargetSlots(currentPlayerId))
+        {
+            slot.Clicked += OnPeekTargetSlotClicked;
+        }
+    }
+
+    private void StartBlindSwap()
+    {
+        drawnCardPanel.SetActive(false);
+        _state = TurnUIState.WaitingForPowerTarget;
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slot in GetTargetSlots(currentPlayerId))
+        {
+            slot.Clicked += OnBlindSwapTargetClicked;
+        }
+    }
+
+    private void StartLookAndSwap()
+    {
+        drawnCardPanel.SetActive(false);
+        _state = TurnUIState.WaitingForPowerTarget;
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slot in GetOwnSlots(currentPlayerId))
+        {
+            slot.Clicked += OnLookAndSwapOwnSlotClicked;
+        }
+    }
+
+    private void OnLookAndSwapOwnSlotClicked(CardSlot slot)
+    {
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetOwnSlots(currentPlayerId))
+        {
+            slots.Clicked -= OnLookAndSwapOwnSlotClicked;
+        }
+        _pendingOwnSlotIndex = slot.SlotIndex;
+        slot.FlashReveal(_controller.State.Players.Find(
+            p => p.PlayerId == currentPlayerId).Slots[slot.SlotIndex], 5f);
+
+        foreach (var slots in GetTargetSlots(currentPlayerId))
+        {
+            slots.Clicked += OnLookAndSwapTargetClicked;
+        }
+    }
+
+    private void OnLookAndSwapTargetClicked(CardSlot slot)
+    {
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetTargetSlots(currentPlayerId))
+        {
+            slots.Clicked -= OnLookAndSwapTargetClicked;
+        }
+
+        PeekOpponentCardCommand lookInner;
+        RedKingLookCommand lookPower;
+        lookInner = new PeekOpponentCardCommand { TargetPlayerId = slot.PlayerId, SlotIndex =  slot.SlotIndex };
+        lookPower = new RedKingLookCommand {LookCommand =  lookInner};
+        if (_controller.TryExecute(lookPower, currentPlayerId))
+        {
+            slot.FlashReveal(lookInner.RevealedCard, 5f);
+            redKingDecisionPanel.SetActive(true);
+            _state = TurnUIState.WaitingForRedKingDecision;
+        }
+
+    }
+
+    public void RedKingSwapNo()
+    {
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        redKingDecisionPanel.SetActive(false);
+        RedKingDecisionCommand redKingDecisionCommand = new RedKingDecisionCommand
+        {
+            ShouldSwap = false
+        };
+        if (_controller.TryExecute(redKingDecisionCommand, currentPlayerId))
+        {
+            Debug.Log("LookAndSwap: declined swap");
+            EnterWaitingForAction();
+        }
+    }
+
+    public void RedKingSwapYes()
+    {
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        redKingDecisionPanel.SetActive(false);
+        RedKingDecisionCommand redKingDecisionCommand = new RedKingDecisionCommand
+        {
+            ShouldSwap = true,
+            OwnSlotIndex = _pendingOwnSlotIndex
+        };
+        if (_controller.TryExecute(redKingDecisionCommand, currentPlayerId))
+        {
+            EnterWaitingForAction();
+            Debug.Log($"LookAndSwap: swapped your slot {_pendingOwnSlotIndex}");
+        }
+    }
+
+    // private void OnRedKingOwnSlotClicked(CardSlot slot)
+    // {
+    //     var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+    //     foreach (var slots in GetOwnSlots(currentPlayerId))
+    //     {
+    //         slots.Clicked -= OnRedKingOwnSlotClicked;
+    //     }
+    //     RedKingDecisionCommand redKingDecisionCommand = new RedKingDecisionCommand
+    //     {
+    //         ShouldSwap = true,
+    //         OwnSlotIndex = slot.SlotIndex
+    //     };
+    //     if (_controller.TryExecute(redKingDecisionCommand, currentPlayerId))
+    //     {
+    //         EnterWaitingForAction();
+    //     }
+    // }
+
+    private void OnBlindSwapTargetClicked(CardSlot slot)
+    {
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetOwnSlots(currentPlayerId))
+        {
+            slots.Clicked += OnBlindSwapOwnSlotClicked;
+        }
+
+        foreach (var slots in GetTargetSlots(currentPlayerId))
+        {
+            slots.Clicked -= OnBlindSwapTargetClicked;
+        }
+        _state = TurnUIState.WaitingForOwnSlotForPower;
+        _pendingTargetPlayerId = slot.PlayerId;
+        _pendingTargetSlotIndex = slot.SlotIndex;
+    }
+
+    private void OnBlindSwapOwnSlotClicked(CardSlot slot)
+    {
+        var currentPlayerId = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetOwnSlots(currentPlayerId))
+        {
+            slots.Clicked -= OnBlindSwapOwnSlotClicked;
+        }
+
+        SwapWithPlayerCommand swapWithPlayerCommand;
+        UseSpecialPowerCommand swapwithPlayerPower;
+        
+        swapWithPlayerCommand = new SwapWithPlayerCommand {OwnSlotIndex= slot.SlotIndex, TargetPlayerId = _pendingTargetPlayerId, TargetSlotIndex = _pendingTargetSlotIndex};
+        swapwithPlayerPower = new UseSpecialPowerCommand { PowerCommand = swapWithPlayerCommand };
+        if (_controller.TryExecute(swapwithPlayerPower, currentPlayerId))
+        {
+            Debug.Log($"BlindSwap: your slot {slot.SlotIndex} <-> Player {_pendingTargetPlayerId}'s slot {_pendingTargetSlotIndex}");
+            EnterWaitingForAction();
+        }
+    }
+
+    private void OnPeekOwnSlotClicked(CardSlot slot)
+    {
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetOwnSlots(currentPlayer))
+        {
+            slots.Clicked -= OnPeekOwnSlotClicked;
+        }
+        PeekOwnCardCommand peekOwnCommand;
+        UseSpecialPowerCommand peekOwnPower;
+        peekOwnCommand = new PeekOwnCardCommand { SlotIndex = slot.SlotIndex };
+        peekOwnPower = new UseSpecialPowerCommand { PowerCommand = peekOwnCommand };
+        if(_controller.TryExecute(peekOwnPower ,currentPlayer))
+        {
+            slot.FlashReveal(peekOwnCommand.RevealedCard, 5f);
+            Debug.Log($"PeekOwn: {slot.SlotIndex}");
+            EnterWaitingForAction();
+        }
+    }
+
+    private void OnPeekTargetSlotClicked(CardSlot slot)
+    {
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetTargetSlots(currentPlayer))
+        { 
+            slots.Clicked -= OnPeekTargetSlotClicked;
+        }
+        PeekOpponentCardCommand peekOpponentCommand;
+        UseSpecialPowerCommand peekOpponentPower;
+        peekOpponentCommand = new PeekOpponentCardCommand { TargetPlayerId = slot.PlayerId, SlotIndex = slot.SlotIndex };
+        peekOpponentPower = new UseSpecialPowerCommand { PowerCommand = peekOpponentCommand };
+        if (_controller.TryExecute(peekOpponentPower, currentPlayer))
+        {
+            slot.FlashReveal(peekOpponentCommand.RevealedCard, 5f);
+            Debug.Log($"PeekTarget: {slot.SlotIndex}");
+            EnterWaitingForAction();
+        }
+    }
+
+    private IEnumerable<CardSlot> GetOwnSlots(int playerId)
+    {
+        foreach (var panel in playerGridPanels)
+        {
+            foreach (var slot in panel.CardSlots)
+            {
+                if (slot.PlayerId == playerId)
+                {
+                    yield return slot;
+                }
+            }
+        }
+    }
+
+    private IEnumerable<CardSlot> GetTargetSlots(int playerId)
+    {
+        foreach (var panel in playerGridPanels)
+        {
+            foreach (var slot in panel.CardSlots)
+            {
+                if (slot.PlayerId != playerId)
+                { 
+                    yield return slot;
+                }
+            }
+        }
+    }
+
     private void OnSwapSlotClicked(CardSlot slot)
     {
-        var currentPlayer = _localPlayer.SeatIndex;
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
         foreach (var slots in GetOwnSlots(currentPlayer))
         {
             slots.Clicked -= OnSwapSlotClicked;
         }
         
-        _localPlayer.CmdSwap(slot.SlotIndex);
+        if (_controller.TryExecute(new SwapDrawnCommand { SlotIndex = slot.SlotIndex }, currentPlayer))
+        {
+            EnterWaitingForAction();
+            Debug.Log($"Swap: {slot.SlotIndex}");
+        }
     }
-    #endregion
-    
-    #region Swap From Discard
-    private void OnDiscardClicked(CardSlot slot)
+
+    public void Discard()
     {
-        // if (!_controller.State.Deck.HasDiscardTop)
-        // {
-        //     Debug.Log("Discard top is empty");
-        //     return;
-        // }
-        var currentPlayer = _localPlayer.SeatIndex;
-        deckSlot.Clicked -= OnDeckClicked;
-        discardSlot.Clicked -= OnDiscardClicked;
-        _state = TurnUIState.WaitingForSwapSlot;
-        Debug.Log("Discard picked up - choose a slot to swap it into");
+        if (!_controller.State.PendingDrawnCard.HasValue)
+        {
+            Debug.Log("Cannot discard right now");
+            return;
+        }
         
-        foreach (var slots in GetOwnSlots(currentPlayer))
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        Card discardedCard = _controller.State.PendingDrawnCard.Value;
+        if (_controller.TryExecute(new DiscardDrawnCommand(), currentPlayer))
         {
-            slots.Clicked += OnSwapFromDiscardSlotClicked;
+            drawnCardPanel.SetActive(false);
+            EnterWaitingForAction();
+            Debug.Log($"Discard: {discardedCard}");
+        }
+        else
+        {
+            Debug.Log("Cannot discard right now");
         }
     }
-    private void OnSwapFromDiscardSlotClicked(CardSlot slot)
-    {
-        var currentPlayer = _localPlayer.SeatIndex;
-        foreach (var slots in GetOwnSlots(currentPlayer))
-        {
-            slots.Clicked -= OnSwapFromDiscardSlotClicked;
-        }
-        _localPlayer.CmdSwapFromDiscard(slot.SlotIndex);
-    }
-    #endregion
-    
-    #region Powers - Dispatch
+
     public void UsePower()
-    { 
+    {
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+
         switch (_currentAbility)
         {
             case SpecialAbility.SkipNext:
-                _localPlayer.CmdSkipNext();
+                var skipNext = new UseSpecialPowerCommand
+                {
+                    PowerCommand = new SkipNextCommand()
+                };
+                if (_controller.TryExecute(skipNext, currentPlayer))
+                {
+                    drawnCardPanel.SetActive(false);
+                    EnterWaitingForAction();
+                }
+                else
+                {
+                    Debug.Log("Cannot skip");
+                }
                 break;
             
             case SpecialAbility.PeekOwn:
@@ -326,208 +411,110 @@ public class TurnUIController : MonoBehaviour
                 break;
         }
     }
-    #endregion
-    
-    #region Powers - Peek Own
-    private void StartPeekOwn()
+
+    public void ShowActions()
     {
-        drawnCardPanel.SetActive(false);
-        _state = TurnUIState.WaitingForOwnSlotForPower;
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slot in GetOwnSlots(currentPlayerId))
+        EnterWaitingForAction();
+        Debug.Log("ShowActions called");
+    }
+    
+    private void EnterWaitingForAction()
+    {
+        actionPanel.SetActive(true);
+        _state = TurnUIState.WaitingForAction;
+        deckSlot.Clicked += OnDeckClicked;
+        discardSlot.Clicked += OnDiscardClicked;
+        drawnCardSlot.ShowEmpty();
+
+        if (_controller != null)
         {
-            slot.Clicked += OnPeekOwnSlotClicked;
+            var current = _controller.State.Players[_controller.State.CurrentPlayerIndex];
+            Debug.Log($"Now {current.PlayerName}'s turn (index {_controller.State.CurrentPlayerIndex})");
         }
     }
-    private void OnPeekOwnSlotClicked(CardSlot slot)
+
+    private void OnDeckClicked(CardSlot slot)
     {
-        var currentPlayer = _localPlayer.SeatIndex;
+        Draw();
+    }
+
+    private void OnDiscardClicked(CardSlot slot)
+    {
+        
+        if (!_controller.State.Deck.HasDiscardTop)
+        {
+            Debug.Log("Discard top is empty");
+            return;
+        }
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        deckSlot.Clicked -= OnDeckClicked;
+        discardSlot.Clicked -= OnDiscardClicked;
+        _state = TurnUIState.WaitingForSwapSlot;
+        Debug.Log("Discard picked up - choose a slot to swap it into");
+        
         foreach (var slots in GetOwnSlots(currentPlayer))
         {
-            slots.Clicked -= OnPeekOwnSlotClicked;
-        } 
-        _localPlayer.CmdPeekOwn(slot.SlotIndex);
-    }
-    #endregion
-    
-    #region Powers - Peek Target
-    private void StartPeekTarget()
-    {
-        drawnCardPanel.SetActive(false);
-        _state = TurnUIState.WaitingForPowerTarget;
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slot in GetTargetSlots(currentPlayerId))
-        {
-            slot.Clicked += OnPeekTargetSlotClicked;
+            slots.Clicked += OnSwapFromDiscardSlotClicked;
         }
     }
-    private void OnPeekTargetSlotClicked(CardSlot slot)
-    {
-        var currentPlayer = _localPlayer.SeatIndex;
-        foreach (var slots in GetTargetSlots(currentPlayer))
-        { 
-            slots.Clicked -= OnPeekTargetSlotClicked;
-        }
-        _localPlayer.CmdPeekTarget(slot.SlotIndex, slot.PlayerId);
-    }
-    #endregion
 
-    #region Powers - Blind Swap
-    private void StartBlindSwap()
+    private void OnSwapFromDiscardSlotClicked(CardSlot slot)
     {
-        drawnCardPanel.SetActive(false);
-        _state = TurnUIState.WaitingForPowerTarget;
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slot in GetTargetSlots(currentPlayerId))
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        foreach (var slots in GetOwnSlots(currentPlayer))
         {
-            slot.Clicked += OnBlindSwapTargetClicked;
+            slots.Clicked -= OnSwapFromDiscardSlotClicked;
+        }
+        
+        SwapFromDiscardCommand swapFromDiscardCommand = new SwapFromDiscardCommand
+        {
+            SlotIndex = slot.SlotIndex,
+        };
+        if (_controller.TryExecute(swapFromDiscardCommand, currentPlayer))
+        {
+            EnterWaitingForAction();
+            Debug.Log($"Swap: {slot.SlotIndex}");
         }
     }
-    private void OnBlindSwapTargetClicked(CardSlot slot)
-    {
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slots in GetOwnSlots(currentPlayerId))
-        {
-            slots.Clicked += OnBlindSwapOwnSlotClicked;
-        }
 
-        foreach (var slots in GetTargetSlots(currentPlayerId))
-        {
-            slots.Clicked -= OnBlindSwapTargetClicked;
-        }
-        _state = TurnUIState.WaitingForOwnSlotForPower;
-        _pendingTargetPlayerId = slot.PlayerId;
-        _pendingTargetSlotIndex = slot.SlotIndex;
-    }
-    private void OnBlindSwapOwnSlotClicked(CardSlot slot)
-    {
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slots in GetOwnSlots(currentPlayerId))
-        {
-            slots.Clicked -= OnBlindSwapOwnSlotClicked;
-        }
-
-        _localPlayer.CmdBlindSwap(slot.SlotIndex, _pendingTargetPlayerId, _pendingTargetSlotIndex);
-        _pendingTargetPlayerId = -1;
-        _pendingTargetSlotIndex = -1;
-    }
-    #endregion
-    
-    #region Powers - Look And Swap
-    private void StartLookAndSwap()
-    {
-        drawnCardPanel.SetActive(false);
-        _state = TurnUIState.WaitingForPowerTarget;
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slot in GetOwnSlots(currentPlayerId))
-        {
-            slot.Clicked += OnLookAndSwapOwnSlotClicked;
-        }
-    }
-    private void OnLookAndSwapTargetClicked(CardSlot slot)
-    {
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slots in GetTargetSlots(currentPlayerId))
-        {
-            slots.Clicked -= OnLookAndSwapTargetClicked;
-        }
-        _pendingTargetPlayerId = slot.PlayerId;
-        _pendingTargetSlotIndex = slot.SlotIndex;
-        _localPlayer.CmdLookAndSwapPeekTarget(_pendingTargetSlotIndex, _pendingTargetPlayerId);
-    }
-    private void OnLookAndSwapOwnSlotClicked(CardSlot slot)
-    {
-        var currentPlayerId = _localPlayer.SeatIndex;
-        foreach (var slots in GetOwnSlots(currentPlayerId))
-        {
-            slots.Clicked -= OnLookAndSwapOwnSlotClicked;
-        }
-        _pendingOwnSlotIndex = slot.SlotIndex;
-        _localPlayer.CmdLookAndSwapPeekOwn(_pendingOwnSlotIndex);
-        foreach (var slots in GetTargetSlots(currentPlayerId))
-        {
-            slots.Clicked += OnLookAndSwapTargetClicked;
-        }
-    }
-    public void RedKingSwapNo()
-    {
-        redKingDecisionPanel.SetActive(false);
-        _localPlayer.CmdRedKingDecision(false, _pendingOwnSlotIndex);
-        _pendingTargetPlayerId = -1;
-        _pendingTargetSlotIndex = -1;
-    }
-    public void RedKingSwapYes()
-    {
-        redKingDecisionPanel.SetActive(false);
-       _localPlayer.CmdRedKingDecision(true, _pendingOwnSlotIndex);
-       _pendingTargetPlayerId = -1;
-       _pendingTargetSlotIndex = -1;
-    }
-    #endregion
-    
-    #region Round End
     public void CallCabboo()
     {
-        _localPlayer.CmdCallCabboo();
+        var currentPlayer = _controller.State.Players[_controller.State.CurrentPlayerIndex].PlayerId;
+        if (_controller.TryExecute(new CallCabbooCommand(), currentPlayer))
+        {
+            Debug.Log($"Cabboo Called! GamePhases = {_controller.State.GamePhases}");
+            ShowRoundEnd();
+        }
+        else
+        {
+            Debug.Log("Cabboo not called");
+        }
     }
-    private void ShowRoundEnd(NetworkGameController.BoardSnapshot snapshot)
+
+    private void ShowRoundEnd()
     {
         actionPanel.SetActive(false);
         deckSlot.Clicked -= OnDeckClicked;
         discardSlot.Clicked -= OnDiscardClicked;
         roundEndPanel.SetActive(true);
-        var roundScorer = snapshot.RoundResults;
-        
-        _scoreBoard.ApplyResultScore(roundScorer.ToList());
+        var roundScorer = RoundScorer.ScoreRound(_controller.State);
+        _scoreBoard.ApplyResultScore(roundScorer);
         
         StringBuilder roundEndBuilder = new StringBuilder();
         
         foreach (var result in roundScorer)
         {
-            var players = Array.Find(snapshot.Players, p => p.PlayerId == result.PlayerId);
-            roundEndBuilder.AppendLine($"{players.PlayerName} {players.PlayerId}: Raw: {result.RawScore} Pts: {result.PointsAwarded} Total: {_scoreBoard.GetTotalScore(result.PlayerId)} {(result.IsCabbooCaller ? "(Called Cabboo)" : "")}"); 
+            var players = _controller.State.Players.Find(p => p.PlayerId == result.PlayerId);
+            
+           roundEndBuilder.AppendLine($"{players.PlayerName} {players.PlayerId}: Raw: {result.RawScore} Pts: {result.PointsAwarded} Total: {_scoreBoard.GetTotalScore(result.PlayerId)} {(result.IsCabbooCaller ? "(Called Cabboo)" : "")}"); 
         }
         roundEndText.text = roundEndBuilder.ToString();
     }
+
     public void NewRound()
     {
         roundEndPanel.SetActive(false);
-        _localPlayer.CmdNewRound();
+        _controller.StartNewRound(playerGridPanels.Count);
+        Debug.Log("New round requested");
     }
-    #endregion
-    
-    #region Helpers
-    private IEnumerable<CardSlot> GetOwnSlots(int playerId)
-    {
-        foreach (var panel in playerGridPanels)
-        {
-            foreach (var slot in panel.CardSlots)
-            {
-                if (slot.PlayerId == playerId)
-                {
-                    yield return slot;
-                }
-            }
-        }
-    }
-    private IEnumerable<CardSlot> GetTargetSlots(int playerId)
-    {
-        foreach (var panel in playerGridPanels)
-        {
-            foreach (var slot in panel.CardSlots)
-            {
-                if (slot.PlayerId != playerId)
-                { 
-                    yield return slot;
-                }
-            }
-        }
-    }
-
-    public void SetPlayerGridPanels(List<PlayerGridPanel> panels)
-    {
-        playerGridPanels = panels;
-    }
-
-    #endregion
 }
