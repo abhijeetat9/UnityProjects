@@ -2,7 +2,6 @@ public class PeekOpponentCardCommand : ICommand
 {
     public int TargetPlayerId;
     public int SlotIndex;
-    public Card RevealedCard;
 
     public bool CanExecute(GameState state, int playerId)
     {
@@ -22,6 +21,6 @@ public class PeekOpponentCardCommand : ICommand
     public void Execute(GameState state, int playerId)
     {
         PlayerState targetPlayer = state.Players.Find(p => p.PlayerId == TargetPlayerId);
-        RevealedCard = targetPlayer.Slots[SlotIndex];
+        state.RevealedTo[targetPlayer.PlayerId][SlotIndex] = playerId;
     }
 }

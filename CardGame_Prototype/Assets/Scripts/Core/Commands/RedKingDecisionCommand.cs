@@ -17,7 +17,6 @@ public class RedKingDecisionCommand : ICommand
                 return false;
             }
         }
-
         return isPlayerTurn;
     }
 
@@ -33,6 +32,7 @@ public class RedKingDecisionCommand : ICommand
             };
             swap.Execute(state, playerId);
         }
+        state.RevealedTo[state.PendingLookAndSwap.TargetPlayerId][state.PendingLookAndSwap.TargetSlotIndex] = null;
         state.Deck.DiscardCard(state.PendingDrawnCard.Value);
         state.PendingLookAndSwap = null;
         state.ClearPendingDrawn();

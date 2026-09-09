@@ -11,7 +11,7 @@ public static class RoundSetup
         deck.Shuffle(new Random());
         
         List<PlayerState> players = Enumerable.Range(0, numPlayers)
-            .Select(i => new PlayerState(i , $"Player {i}"))
+            .Select(i => new PlayerState(i , $"Player {i + 1}"))
             .ToList();
         
         foreach (var player in players)

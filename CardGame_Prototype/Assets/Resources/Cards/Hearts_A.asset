@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardDefinition
   suit: 3
   rank: 1
-  faceSprite: {fileID: -939575413, guid: ea5c0f43d49684beb9033b7d507352f6, type: 3}
+  faceSprite: {fileID: 1775651416, guid: 7df6f11d09eb43afa2acf17733afa499, type: 3}

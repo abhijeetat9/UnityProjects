@@ -29,7 +29,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.5, y: 1.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -107,7 +107,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardSlot
   cardDatabase: {fileID: 11400000, guid: c3f610a3505ee433bad52b46cebe088f, type: 2}
-  cardBackSprite: {fileID: 866546828, guid: 9f61a1d3e8af5411bac5b317bbc4ff9e, type: 3}
+  cardBackSprite: {fileID: 1248976841, guid: 7df6f11d09eb43afa2acf17733afa499, type: 3}
   spriteRenderer: {fileID: 5496740643913716131}
 --- !u!61 &-5214278372956081323
 BoxCollider2D:

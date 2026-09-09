@@ -4,28 +4,28 @@ public class SpecialAbilityResolverTests
 {
     [Test]
 
-    public void GetAbility_Rank7_ReturnsPeekOwn()
+    public void GetAbility_Rank9_ReturnsPeekOwn()
     {
         var card = new Card(Suit.Clubs, 9);
         Assert.AreEqual(SpecialAbility.PeekOwn, SpecialAbilityResolver.GetAbility(card));
     }
 
     [Test]
-    public void GetAbility_Rank8_ReturnsPeekOwn()
+    public void GetAbility_Rank10_ReturnsPeekOwn()
     {
         var card = new Card(Suit.Hearts, 10);
         Assert.AreEqual(SpecialAbility.PeekOwn, SpecialAbilityResolver.GetAbility(card));
     }
 
     [Test]
-    public void GetAbility_Rank9_ReturnsPeekTarget()
+    public void GetAbility_Rank7_ReturnsPeekTarget()
     {
         var card = new Card(Suit.Spades, 7);
         Assert.AreEqual(SpecialAbility.PeekTarget, SpecialAbilityResolver.GetAbility(card));
     }
 
     [Test]
-    public void GetAbility_Rank10_ReturnsPeekTarget()
+    public void GetAbility_Rank8_ReturnsPeekTarget()
     {
         var card = new Card(Suit.Diamonds, 8);
         Assert.AreEqual(SpecialAbility.PeekTarget, SpecialAbilityResolver.GetAbility(card));
@@ -53,7 +53,7 @@ public class SpecialAbilityResolverTests
     }
 
     [Test]
-    public void GetAbility_Rank14_ReturnsLookAndSwap()
+    public void GetAbility_Rank13_SpadesReturnsNone()
     {
         var card = new Card(Suit.Spades, 13);
         Assert.AreEqual(SpecialAbility.None, SpecialAbilityResolver.GetAbility(card));
