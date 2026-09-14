@@ -50,13 +50,13 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Link Vercel project
-        run: |
-          mkdir -p CardGame_Prototype/build/WebGL/.vercel
-          cat > CardGame_Prototype/build/WebGL/.vercel/project.json << EOF
-          {"projectId":"${{ secrets.VERCEL_PROJECT_ID }}","orgId":"${{ secrets.VERCEL_ORG_ID }}"}
-          EOF
-
       - name: Deploy WebGL client to Vercel
-        working-directory: CardGame_Prototype/build/WebGL
-        run: npx vercel@latest deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        # game-ci/unity-builder runs as root inside its container, so
+        # build/WebGL ends up root-owned and this (non-root) step can't
+        # write a .vercel/project.json link file into it. Passing
+        # VERCEL_ORG_ID/VERCEL_PROJECT_ID as env vars instead avoids
+        # needing to write anything into the build output directory.
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel@latest deploy CardGame_Prototype/build/WebGL --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
