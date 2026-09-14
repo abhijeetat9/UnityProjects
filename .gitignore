@@ -84,9 +84,13 @@ $RECYCLE.BIN/
 # .vscode/tasks.json
 
 # Exclude Script Assemblies
+# (but keep DLLs that ship inside embedded packages, e.g. Mirror's
+# Mono.CecilX/BouncyCastle plugin DLLs required by its Weaver - those are
+# real dependencies, not build artifacts, and must be committed)
 *.dll
 *.dll.mdb
 *.exe
+!CardGame_Prototype/Packages/com.mirrornetworking.mirror/**/*.dll
 
 # Exclude the .vs folder that Visual Studio generates
 .vs/
