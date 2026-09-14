@@ -8,6 +8,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Auth.unity
     guid: c1d2e3f4a5b647c8d9e0f1a2b3c4d5e6
+  - enabled: 1
+    path: Assets/Scenes/Instruction.unity
+    guid: 6237b4677b1a046f7a634e62c7cbbbe9
   - enabled: 0
     path: Assets/Scenes/DedicatedServer.unity
     guid: 3d39b48a337ed44aebb0deb22ffcb513

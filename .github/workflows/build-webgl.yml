@@ -1,0 +1,51 @@
+name: Build WebGL client
+
+on:
+  push:
+    branches: [CardGame_Prototype]
+    paths:
+      - "CardGame_Prototype/Assets/**"
+      - "CardGame_Prototype/Packages/**"
+      - "CardGame_Prototype/ProjectSettings/**"
+      - ".github/workflows/build-webgl.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    name: Build WebGL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: CardGame_Prototype/Library
+          key: Library-WebGL-${{ hashFiles('CardGame_Prototype/Assets/**', 'CardGame_Prototype/Packages/**', 'CardGame_Prototype/ProjectSettings/**') }}
+          restore-keys: |
+            Library-WebGL-
+
+      - name: Build WebGL client
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: CardGame_Prototype
+          unityVersion: 6000.5.6f1
+          targetPlatform: WebGL
+          buildMethod: BuildScript.BuildWebGLClient
+
+      - name: Upload WebGL build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cabboo-webgl-client
+          # BuildScript.BuildWebGLClient() writes to "build/WebGL" relative
+          # to the Unity project's working directory, which is projectPath.
+          path: CardGame_Prototype/build/WebGL
+          retention-days: 14
+          if-no-files-found: error

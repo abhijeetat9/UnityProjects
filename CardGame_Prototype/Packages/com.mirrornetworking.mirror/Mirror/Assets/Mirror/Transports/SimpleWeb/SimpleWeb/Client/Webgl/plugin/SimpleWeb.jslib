@@ -32,11 +32,24 @@ function IsConnected(index)
 function Connect(addressPtr, openCallbackPtr, closeCallBackPtr, messageCallbackPtr, errorCallbackPtr)
 {
     // fix for unity 2021 because unity bug in .jslib
+    // Modern Emscripten (Unity 6+) removed the global `Runtime` object AND the
+    // generic `dynCall(sig, ptr, args)` function it used to provide. Function
+    // pointers are now called either via per-signature Module['dynCall_XX']
+    // exports, or directly through the wasm table. This shim tries both so it
+    // keeps working across Emscripten versions without needing a Unity-version check.
     if (typeof Runtime === "undefined")
     {
-        // if unity doesn't create Runtime, then make it here
-        // dont ask why this works, just be happy that it does
-        var Runtime = { dynCall: dynCall }
+        var Runtime = {
+            dynCall: function(sig, ptr, args) {
+                var fn = (typeof Module !== "undefined") && Module['dynCall_' + sig];
+                if (fn) return fn.apply(null, [ptr].concat(args));
+                if (typeof dynCall === "function") return dynCall(sig, ptr, args);
+                var table = (typeof wasmTable !== "undefined") ? wasmTable
+                    : (typeof Module !== "undefined" ? Module['wasmTable'] : undefined);
+                if (table) return table.get(ptr).apply(null, args);
+                throw new Error("SimpleWeb.jslib: no way to call function pointer (sig=" + sig + ")");
+            }
+        };
     }
 
     const address = UTF8ToString(addressPtr);

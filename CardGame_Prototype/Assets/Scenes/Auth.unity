@@ -580,6 +580,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   backendBaseUrl: https://cardgameprototype.onrender.com
   nextSceneName: Lobby
+  instructionsSceneName: Instruction
   loginPanelRoot: {fileID: 255277635}
   loginUsernameField: {fileID: 1970887148}
   loginPasswordField: {fileID: 284479892}

@@ -14,6 +14,7 @@ namespace CardGame.UI
         [Header("Backend")]
         [SerializeField] private string backendBaseUrl = "https://cardgameprototype.onrender.com";
         [SerializeField] private string nextSceneName = "Lobby";
+        [SerializeField] private string instructionsSceneName = "Instructions";
 
         [Header("Live UI References (drag the prefab-instantiated panel's children here)")]
         [SerializeField] private GameObject loginPanelRoot;
@@ -160,7 +161,9 @@ namespace CardGame.UI
                 PlayerPrefs.SetString("auth_username", _loginData.username);
                 PlayerPrefs.Save();
                 loginStatusText.text = "Successfully logged in!";
-                SceneManager.LoadScene(nextSceneName);
+
+                bool seenInstructions = InstructionsController.HasSeenInstructions(_loginData.username);
+                SceneManager.LoadScene(seenInstructions ? nextSceneName : instructionsSceneName);
             }
             else
             {

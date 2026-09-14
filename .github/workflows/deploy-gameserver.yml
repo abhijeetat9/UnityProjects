@@ -1,0 +1,52 @@
+name: Deploy dedicated server to Oracle VM
+
+# This does NOT build the Unity server binary - the Oracle VM is ARM64 and
+# a standard GitHub-hosted runner is x86_64, so building an ARM64 IL2CPP
+# Linux binary in CI isn't practical here. Instead: build the "Linux
+# Server" profile locally in the Editor as before, commit the resulting
+# binary/GameServer-Oracle folder, and pushing that commit triggers this
+# workflow to ship it to the VM and restart the container.
+on:
+  push:
+    branches: [CardGame_Prototype]
+    paths:
+      - "GameServer-Oracle/**"
+      - ".github/workflows/deploy-gameserver.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    name: Deploy to Oracle VM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy GameServer-Oracle to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ORACLE_SSH_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          source: "GameServer-Oracle/*"
+          target: "~/cabboo-gameserver"
+          strip_components: 1
+
+      - name: Rebuild and restart container on VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ORACLE_SSH_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/cabboo-gameserver
+            docker build -t cabboo-gameserver:latest .
+            docker stop cabboo-gameserver 2>/dev/null || true
+            docker rm cabboo-gameserver 2>/dev/null || true
+            docker run -d \
+              --name cabboo-gameserver \
+              --restart unless-stopped \
+              -p 27777:27777 \
+              cabboo-gameserver:latest
+            docker image prune -f
