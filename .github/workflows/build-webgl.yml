@@ -49,3 +49,14 @@ jobs:
           path: CardGame_Prototype/build/WebGL
           retention-days: 14
           if-no-files-found: error
+
+      - name: Link Vercel project
+        run: |
+          mkdir -p CardGame_Prototype/build/WebGL/.vercel
+          cat > CardGame_Prototype/build/WebGL/.vercel/project.json << EOF
+          {"projectId":"${{ secrets.VERCEL_PROJECT_ID }}","orgId":"${{ secrets.VERCEL_ORG_ID }}"}
+          EOF
+
+      - name: Deploy WebGL client to Vercel
+        working-directory: CardGame_Prototype/build/WebGL
+        run: npx vercel@latest deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}

@@ -16,7 +16,6 @@ public class GameState
     {
         CabbooCallerIndex = CurrentPlayerIndex;
         GamePhases = GamePhase.RoundEnded;
-        //AdvanceTurn();
     }
 
     public void DrawingCard()
