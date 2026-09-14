@@ -49,3 +49,4 @@ public static class BuildScript
         Debug.Log($"BuildScript: WebGL build succeeded, {report.summary.totalSize} bytes, output at {buildPlayerOptions.locationPathName}");
     }
 }
+
